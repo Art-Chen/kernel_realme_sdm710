@@ -4982,8 +4982,15 @@ static int sde_crtc_onscreenfinger_atomic_check(struct sde_crtc_state *cstate,
 			if (fp_mode == 0) {
 				pstates[fppressed_index].sde_pstate->property_values[PLANE_PROP_ALPHA].value = 0;
 				fppressed_index = -1;
+				if (aod_index >= 0) {
+					pstates[aod_index].sde_pstate->property_values[PLANE_PROP_ALPHA].value = 0xff;
+				}
 			} else {
 				pstates[fppressed_index].sde_pstate->property_values[PLANE_PROP_ALPHA].value = 0xff;
+				if (aod_index >= 0) {
+					pstates[aod_index].sde_pstate->property_values[PLANE_PROP_ALPHA].value = 0x0;
+				}
+
 			}
 		}
 
@@ -5009,6 +5016,9 @@ static int sde_crtc_onscreenfinger_atomic_check(struct sde_crtc_state *cstate,
 			if (zpos > pstates[aod_index].stage)
 				zpos = pstates[aod_index].stage;
 			pstates[aod_index].stage++;
+			if (dimlayer_hbm) {
+				pstates[aod_index].sde_pstate->property_values[PLANE_PROP_ALPHA].value = 0x0;
+			}
 		}
 		if (fppressed_index >= 0) {
 			if (zpos > pstates[fppressed_index].stage)
