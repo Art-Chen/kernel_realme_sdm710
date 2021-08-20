@@ -5063,7 +5063,15 @@ static int sde_crtc_onscreenfinger_atomic_check(struct sde_crtc_state *cstate,
 		cstate->fingerprint_mode = false;
 		cstate->fingerprint_pressed = false;
 	}
-
+	
+	if (fp_mode == 1 && !dimlayer_hbm) {
+		cstate->fingerprint_mode = true;
+		cstate->fingerprint_pressed = true;
+	} else if (lcd_closebl_flag_fp) {
+		oppo_underbrightness_alpha = 0;
+		cstate->fingerprint_dim_layer = NULL;
+		cstate->fingerprint_mode = false;
+	}
 	return 0;
 }
 #endif /* CONFIG_PRODUCT_REALME_SDM710 */
