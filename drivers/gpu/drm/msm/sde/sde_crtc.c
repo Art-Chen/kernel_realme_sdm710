@@ -4925,6 +4925,8 @@ extern int lcd_closebl_flag_fp;
 extern int oppo_dimlayer_hbm;
 extern int oppo_dimlayer_bl_alpha_value;
 extern int oppo_dimlayer_bl_enable;
+extern int dimlayer_hbm_is_single_layer;
+extern int chen_need_active_hbm_next_frame;
 extern bool oppo_ffl_trigger_finish;
 extern ktime_t oppo_backlight_time;
 extern u32 oppo_last_backlight;
@@ -4957,6 +4959,13 @@ static int sde_crtc_onscreenfinger_atomic_check(struct sde_crtc_state *cstate,
 			aod_index = i;
 	}
 
+    dimlayer_hbm_is_single_layer = cnt == 2 ? 1 : 0;
+    
+    if (fppressed_index != -1) {
+        pr_err("Art_Chen :Check Fingerprint layer, reason: fp_index is %d, fppressed_index is %d aod_index is %d\n", fp_index, fppressed_index, aod_index);
+        dimlayer_hbm_is_single_layer = 0;
+    }
+    
 	if (oppo_dimlayer_bl_enable) {
 		int backlight = oppo_get_panel_brightness();
 		if (backlight > 1 && backlight < oppo_dimlayer_bl_alpha_value &&
@@ -4980,20 +4989,37 @@ static int sde_crtc_onscreenfinger_atomic_check(struct sde_crtc_state *cstate,
 
 		if (fppressed_index >= 0) {
 			if (fp_mode == 0) {
-				pstates[fppressed_index].sde_pstate->property_values[PLANE_PROP_ALPHA].value = 0;
+				//pstates[fppressed_index].sde_pstate->property_values[PLANE_PROP_ALPHA].value = 0;
 				fppressed_index = -1;
-				if (aod_index >= 0) {
-					pstates[aod_index].sde_pstate->property_values[PLANE_PROP_ALPHA].value = 0xff;
-				}
-			} else {
-				pstates[fppressed_index].sde_pstate->property_values[PLANE_PROP_ALPHA].value = 0xff;
-				if (aod_index >= 0) {
-					pstates[aod_index].sde_pstate->property_values[PLANE_PROP_ALPHA].value = 0x0;
-				}
-
+				
 			}
 		}
-
+    
+    if (dimlayer_hbm && fppressed_index == -1 && cnt > 0) {
+		// pr_err("Art_Chen cnt %d ", cnt);
+        if (chen_need_active_hbm_next_frame) {
+            if (!dimlayer_hbm_is_single_layer) {
+				int tempZPos = 0;
+				for (i = 0; i < cnt; i++) {
+					if (pstates[i].stage > tempZPos) {
+						tempZPos = pstates[i].stage;
+						fppressed_index = i;
+					}
+				}
+			} else {
+				fppressed_index = 1;
+			}
+			// pr_err("Art_Chen force fp_pressed layer %d ", fppressed_index);
+            // if (chen_need_active_hbm_next_frame != last_chen_need_active_hbm_next_frame) {
+            //     fppressed_index = 1;
+            //     pstates[1].sde_pstate->is_skip = true;
+            // } else {
+            //     fppressed_index = 1;
+            // }
+            cstate->fingerprint_pressed = fp_mode == 1;
+        }
+    }
+    
 	if (dimlayer_hbm || dimlayer_bl) {
 		if (fp_index >= 0 && fppressed_index >= 0) {
 			if (pstates[fp_index].stage >= pstates[fppressed_index].stage) {
@@ -5053,10 +5079,12 @@ static int sde_crtc_onscreenfinger_atomic_check(struct sde_crtc_state *cstate,
 			SDE_ERROR("Failed to config dim layer\n");
 			return -EINVAL;
 		}
-		if (fppressed_index >= 0)
-			cstate->fingerprint_pressed = true;
-		else
-			cstate->fingerprint_pressed = false;
+        if (!chen_need_active_hbm_next_frame) {
+            if (fppressed_index >= 0)
+                cstate->fingerprint_pressed = true;
+            else
+                cstate->fingerprint_pressed = false;
+        }
 	} else {
 		oppo_underbrightness_alpha = 0;
 		cstate->fingerprint_dim_layer = NULL;
